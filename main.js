@@ -4,10 +4,11 @@
     WIDTH,
     HEIGHT,
     COLORS,
+    ClickStartScene,
     TitleScene,
     StageSelectScene,
-    ControlsScene,
     RulesScene,
+    CreditsScene,
     GameScene,
   } = FuncJump;
 
@@ -24,7 +25,7 @@
         debug: false,
       },
     },
-    scene: [TitleScene, StageSelectScene, ControlsScene, RulesScene, GameScene],
+    scene: [ClickStartScene, TitleScene, StageSelectScene, RulesScene, CreditsScene, GameScene],
   };
 
   new Phaser.Game(config);

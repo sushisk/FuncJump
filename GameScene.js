@@ -10,7 +10,9 @@
     PLATFORM_THICKNESS_MAX,
     FUNC_DRAW_EXTENT,
     FUNC_MARCH_STEP,
+    RENDER_LIMIT_TIME,
     APPLY_COOLDOWN_MS,
+    SE_VOLUME,
   } = FuncJump;
 
   class GameScene extends Phaser.Scene {
@@ -20,6 +22,13 @@
 
     init(data) {
       this.stageIndex = data.stageIndex ?? 0;
+    }
+
+    preload() {
+      this.load.audio("clear", "./sound/clear.mp3");
+      this.load.audio("failed","./sound/failed.mp3");
+      this.load.audio("checkpoint","./sound/checkpoint.mp3");
+      this.load.audio("function-apply", "./sound/function-apply.mp3");
     }
 
     create() {
@@ -41,6 +50,9 @@
       this.currentFunction = null;
       this.groundPairs = new Set();
       this.lastApplyAt = 0;
+      this.checkpoints = [];
+      this.checkpointByBody = new Map();
+      this.goalUnlocked = false;
 
       this.matter.world.setBounds(0, 0, WIDTH, HEIGHT);
 
@@ -88,11 +100,12 @@
         label: "goal",
       });
 
+      this.createCheckpoints(stage);
+      this.updateGoalState();
+
       this.setupCollisionEvents();
 
       this.cursors = this.input.keyboard.createCursorKeys();
-      this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-      this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
       this.keyR = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
 
       this.isCleared = false;
@@ -119,7 +132,13 @@
         FuncJump.UI.setHandlers({
           onApply: (text) => {
             this.resetPlayerToStart();
-            this.applyFunctionInput(text);
+            this.resetCheckpoints();
+            const result = this.applyFunctionInput(text, { timeLimitMs: RENDER_LIMIT_TIME });
+            if (result === "ok") {
+              this.playSfx("function-apply");
+            } else if (result === "time-limit") {
+              FuncJump.UI?.setError("Function too complex");
+            }
           },
         });
       }
@@ -134,13 +153,20 @@
             const other = bodyA === playerBody ? bodyB : bodyA;
             const normalY = bodyA === playerBody ? pair.collision.normal.y : -pair.collision.normal.y;
 
+            if (other.label === "checkpoint") {
+              this.handleCheckpoint(other);
+            }
+
             if (other.isSensor && other.label === "goal") {
-              this.handleClear();
+              if (this.goalUnlocked) {
+                this.handleClear();
+              }
               return;
             }
 
             if (other.label === "reset-platform") {
               this.handleResetTrigger();
+              this.playSfx("failed");
             }
 
             if (normalY < -0.5 && !other.isSensor) {
@@ -163,6 +189,60 @@
       return this.groundPairs.size > 0;
     }
 
+    createCheckpoints(stage) {
+      this.checkpoints = [];
+      this.checkpointByBody.clear();
+      const list = stage.checkpoints || [];
+
+      list.forEach((point, index) => {
+        const rect = this.add
+          .rectangle(point.x, point.y, 26, 26, COLORS.blueSoft)
+          .setStrokeStyle(2, COLORS.white);
+        this.matter.add.gameObject(rect, {
+          isStatic: true,
+          isSensor: true,
+          label: "checkpoint",
+        });
+        rect.setData("checkpointIndex", index);
+
+        const entry = { rect, passed: false };
+        this.checkpoints.push(entry);
+        if (rect.body) {
+          this.checkpointByBody.set(rect.body, entry);
+        }
+      });
+    }
+
+    handleCheckpoint(body) {
+      const entry = this.checkpointByBody.get(body);
+      if (!entry || entry.passed) return;
+      entry.passed = true;
+      entry.rect.setFillStyle(COLORS.white);
+      this.playSfx("checkpoint");
+      this.updateGoalState();
+    }
+
+    resetCheckpoints() {
+      this.checkpoints.forEach((entry) => {
+        entry.passed = false;
+        entry.rect.setFillStyle(COLORS.blueSoft);
+      });
+      this.updateGoalState();
+    }
+
+    updateGoalState() {
+      const allPassed = this.checkpoints.length === 0 || this.checkpoints.every((c) => c.passed);
+      this.goalUnlocked = allPassed;
+      if (!this.goal) return;
+      if (allPassed) {
+        this.goal.setFillStyle(COLORS.blueSoft);
+        this.goal.setAlpha(1);
+      } else {
+        this.goal.setFillStyle(COLORS.panel);
+        this.goal.setAlpha(0.55);
+      }
+    }
+
     handleResetTrigger() {
       const now = this.time.now;
       if (now - this.lastApplyAt < APPLY_COOLDOWN_MS) return;
@@ -170,6 +250,7 @@
 
       const text = FuncJump.UI?.input ? FuncJump.UI.input.value : "";
       this.resetPlayerToStart();
+      this.resetCheckpoints();
       this.applyFunctionInput(text);
     }
 
@@ -224,29 +305,34 @@
       graphics.setDepth(0);
     }
 
-    applyFunctionInput(text) {
+    applyFunctionInput(text, options = {}) {
       this.clearCustomPlatforms();
 
       if (!text || !text.trim()) {
         this.currentFunction = null;
         FuncJump.UI?.setError("");
-        return;
+        return "no-input";
       }
 
       const result = this.parseFunctionInput(text);
       if (!result) {
         this.currentFunction = null;
         FuncJump.UI?.setError("Use equations like y = x or y*y = sin(x)");
-        return;
+        return "invalid-input";
       }
 
       FuncJump.UI?.setError("");
       this.currentFunction = result.fn;
-      this.buildFunctionPlatforms(result);
+      const status = this.buildFunctionPlatforms(result, options.timeLimitMs);
+      if (status === "time-limit") {
+        this.invalidateFunctionRender();
+        return "time-limit";
+      }
+      return "ok";
     }
 
     parseFunctionInput(text) {
-      const trimmed = text.trim();
+      const trimmed = text.trim().toLowerCase();
       if (!trimmed) return null;
 
       const parts = trimmed.split("=");
@@ -273,16 +359,25 @@
     }
 
     normalizeExpression(expression) {
-      const allowedChars = /^[0-9a-zA-Z+\-*/^().,\s]*$/;
-      if (!allowedChars.test(expression)) return null;
+      let normalized = expression.toLowerCase();
+      normalized = this.insertImplicitMultiplication(normalized);
 
-      const identifiers = expression.match(/[a-zA-Z_]+/g) || [];
+      const allowedChars = /^[0-9a-z+\-*/^().,\s]*$/;
+      if (!allowedChars.test(normalized)) return null;
+
+      const identifiers = normalized.match(/[a-z_]+/g) || [];
       const allowedNames = new Set([
         "x",
         "y",
         "sin",
         "cos",
         "tan",
+        "asin",
+        "acos",
+        "atan",
+        "sinh",
+        "cosh",
+        "tanh",
         "log",
         "exp",
         "sqrt",
@@ -297,13 +392,18 @@
         if (!allowedNames.has(lower)) return null;
       }
 
-      let normalized = expression;
       normalized = normalized.replace(/\^/g, "**");
       normalized = normalized.replace(/\bpi\b/gi, "Math.PI");
       normalized = normalized.replace(/\be\b/gi, "Math.E");
       normalized = normalized.replace(/\bsin\b/gi, "Math.sin");
       normalized = normalized.replace(/\bcos\b/gi, "Math.cos");
       normalized = normalized.replace(/\btan\b/gi, "Math.tan");
+      normalized = normalized.replace(/\basin\b/gi, "Math.asin");
+      normalized = normalized.replace(/\bacos\b/gi, "Math.acos");
+      normalized = normalized.replace(/\batan\b/gi, "Math.atan");
+      normalized = normalized.replace(/\bsinh\b/gi, "Math.sinh");
+      normalized = normalized.replace(/\bcosh\b/gi, "Math.cosh");
+      normalized = normalized.replace(/\btanh\b/gi, "Math.tanh");
       normalized = normalized.replace(/\blog\b/gi, "Math.log");
       normalized = normalized.replace(/\bexp\b/gi, "Math.exp");
       normalized = normalized.replace(/\bsqrt\b/gi, "Math.sqrt");
@@ -313,7 +413,16 @@
       return normalized;
     }
 
-    buildFunctionPlatforms({ fn }) {
+    insertImplicitMultiplication(expression) {
+      return expression
+        .replace(/(\d)([a-z(])/g, "$1*$2")
+        .replace(/([xy\)])(\d)/g, "$1*$2")
+        .replace(/([xy\)])([a-z(])/g, "$1*$2")
+        .replace(/(\))(\()/g, "$1*$2");
+    }
+
+    buildFunctionPlatforms({ fn }, timeLimitMs = null) {
+      const startTime = timeLimitMs ? performance.now() : 0;
       const { halfWidth, halfHeight } = this.functionDrawBounds;
       const step = FUNC_MARCH_STEP;
       const scale = GRID_SIZE;
@@ -333,6 +442,34 @@
           const y = yMin + yi * step;
           const val = fn(x / scale, y / scale);
           values[xi][yi] = Number.isFinite(val) ? val : null;
+          if (timeLimitMs && performance.now() - startTime > timeLimitMs) {
+            return "time-limit";
+          }
+        }
+      }
+
+      // Invalidate cells across sharp jumps to avoid linking discontinuities (e.g., tan).
+      const jumpThreshold = -30;
+      for (let xi = 0; xi < xSteps; xi += 1) {
+        for (let yi = 0; yi <= ySteps; yi += 1) {
+          const vA = values[xi][yi];
+          const vB = values[xi + 1][yi];
+          if (vA === null || vB === null) continue;
+          if (vA * vB < jumpThreshold) {
+            values[xi][yi] = null;
+            values[xi + 1][yi] = null;
+          }
+        }
+      }
+      for (let xi = 0; xi <= xSteps; xi += 1) {
+        for (let yi = 0; yi < ySteps; yi += 1) {
+          const vA = values[xi][yi];
+          const vB = values[xi][yi + 1];
+          if (vA === null || vB === null) continue;
+          if (vA * vB < jumpThreshold) {
+            values[xi][yi] = null;
+            values[xi][yi + 1] = null;
+          }
         }
       }
 
@@ -368,8 +505,13 @@
             if (!pA || !pB) return;
             this.addFunctionSegmentBetween(pA, pB, thickness);
           });
+
+          if (timeLimitMs && performance.now() - startTime > timeLimitMs) {
+            return "time-limit";
+          }
         }
       }
+      return "ok";
     }
 
     computeCellIntersections(x0, y0, x1, y1, v0, v1, v2, v3) {
@@ -575,6 +717,19 @@
       this.functionGraphics.lineBetween(worldA.x, worldA.y, worldB.x, worldB.y);
     }
 
+    invalidateFunctionRender() {
+      this.currentFunction = null;
+      this.clearCustomPlatforms();
+    }
+
+    playSfx(key) {
+      const sound = this.sound.get(key) || this.sound.add(key, { volume: SE_VOLUME });
+      if (sound) {
+        sound.play();
+      }
+    }
+
+
     resetPlayerToStart() {
       const stage = STAGES[this.stageIndex];
       if (!this.player || !stage) return;
@@ -594,6 +749,8 @@
         this.player.setVelocity(0, 0);
         this.player.setStatic(true);
       }
+
+      this.playSfx("clear");
 
       const centerX = WIDTH / 2;
       const centerY = HEIGHT / 2;
@@ -625,8 +782,8 @@
     update() {
       if (!this.player || this.isCleared) return;
 
-      const left = this.cursors.left.isDown || this.keyA.isDown;
-      const right = this.cursors.right.isDown || this.keyD.isDown;
+      const left = this.cursors.left.isDown
+      const right = this.cursors.right.isDown
 
       if (left) {
         this.player.setVelocityX(-5);

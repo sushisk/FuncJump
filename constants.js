@@ -9,9 +9,10 @@
   FuncJump.FUNC_DRAW_EXTENT = 3;
   FuncJump.WALL_THICKNESS = 24;
   FuncJump.FUNC_MARCH_STEP = 4;
-  FuncJump.SLIDE_ACCELERATION = 280;
-  FuncJump.FUNC_ON_CURVE_EPS = 0.15;
+  FuncJump.RENDER_LIMIT_TIME = 3000;
   FuncJump.APPLY_COOLDOWN_MS = 400;
+  FuncJump.SE_VOLUME = 0.7;
+  FuncJump.BGM_VOLUME = 0.7;
 
   FuncJump.COLORS = {
     bg: 0x0a1b3d,

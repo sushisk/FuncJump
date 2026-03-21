@@ -26,7 +26,7 @@
         const row = Math.floor(index / 3);
         const col = index % 3;
         const x = centerX + (col - 1) * 220;
-        const y = 160 + row * 140;
+        const y = 140 + row * 140;
 
         const panel = this.add
           .rectangle(x, y, 180, 80, COLORS.panel)
