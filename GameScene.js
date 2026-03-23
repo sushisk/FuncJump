@@ -780,7 +780,7 @@
         color: "#ffffff",
         fontStyle: "bold",
       }).setOrigin(0.5);
-      const sub = this.add.text(centerX, centerY + 30, "Click to go to next stage", {
+      const sub = this.add.text(centerX, centerY + 30, "Click or press Z to continue", {
         fontSize: "14px",
         color: "#8cc9ff",
       }).setOrigin(0.5);
@@ -789,11 +789,16 @@
       text.setDepth(20);
       sub.setDepth(20);
 
-      sub.setText("Press Space to go to next stage");
-      this.input.keyboard.once("keydown-SPACE", () => {
-        const nextIndex = (this.stageIndex + 1) % STAGES.length;
-        this.scene.start("GameScene", { stageIndex: nextIndex });
-      });
+      const goNext = () => {
+        if (this.stageIndex + 1 >= STAGES.length) {
+          this.scene.start("StageSelectScene");
+        } else {
+          this.scene.start("GameScene", { stageIndex: this.stageIndex + 1 });
+        }
+      };
+
+      this.input.once("pointerdown", goNext);
+      this.input.keyboard.once("keydown-Z", goNext);
     }
 
     update() {
