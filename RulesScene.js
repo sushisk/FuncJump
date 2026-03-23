@@ -28,6 +28,7 @@
         "Some stages include a reset platform that",
         "applies the current function instantly.",
         "",
+        "Jump key: Z",
         "Use the function input to create platforms",
         "and solve each stage.",
       ];

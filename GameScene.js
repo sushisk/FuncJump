@@ -24,13 +24,6 @@
       this.stageIndex = data.stageIndex ?? 0;
     }
 
-    preload() {
-      this.load.audio("clear", "./sound/clear.mp3");
-      this.load.audio("failed","./sound/failed.mp3");
-      this.load.audio("checkpoint","./sound/checkpoint.mp3");
-      this.load.audio("function-apply", "./sound/function-apply.mp3");
-    }
-
     create() {
       this.cameras.main.setBackgroundColor(COLORS.bg);
 
@@ -107,6 +100,30 @@
 
       this.cursors = this.input.keyboard.createCursorKeys();
       this.keyR = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+      this.keyZ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
+      this.mobileInput = { left: false, right: false, jumpRequested: false };
+      this.pointerZones = new Map();
+
+      if (FuncJump.IS_MOBILE) {
+        this.input.on("pointerdown", (pointer) => {
+          const zone = this.getPointerZone(pointer.x);
+          this.pointerZones.set(pointer.id, zone);
+          if (zone === "center") {
+            this.mobileInput.jumpRequested = true;
+          }
+          this.updateMobileDirections();
+        });
+
+        this.input.on("pointerup", (pointer) => {
+          this.pointerZones.delete(pointer.id);
+          this.updateMobileDirections();
+        });
+
+        this.input.on("pointercancel", (pointer) => {
+          this.pointerZones.delete(pointer.id);
+          this.updateMobileDirections();
+        });
+      }
 
       this.isCleared = false;
       this.coyoteFrames = 0;
@@ -782,8 +799,8 @@
     update() {
       if (!this.player || this.isCleared) return;
 
-      const left = this.cursors.left.isDown
-      const right = this.cursors.right.isDown
+      const left = FuncJump.IS_MOBILE ? this.mobileInput.left : this.cursors.left.isDown;
+      const right = FuncJump.IS_MOBILE ? this.mobileInput.right : this.cursors.right.isDown;
 
       if (left) {
         this.player.setVelocityX(-5);
@@ -800,10 +817,14 @@
         this.coyoteFrames -= 1;
       }
 
-      if (Phaser.Input.Keyboard.JustDown(this.cursors.space) && this.coyoteFrames > 0) {
+      if (
+        (FuncJump.IS_MOBILE ? this.mobileInput.jumpRequested : Phaser.Input.Keyboard.JustDown(this.keyZ)) &&
+        this.coyoteFrames > 0
+      ) {
         this.player.setVelocityY(-9);
         this.coyoteFrames = 0;
       }
+      this.mobileInput.jumpRequested = false;
 
       if (Phaser.Input.Keyboard.JustDown(this.keyR)) {
         this.scene.restart({ stageIndex: this.stageIndex });
@@ -812,6 +833,24 @@
       if (this.player.y > HEIGHT + 60) {
         this.scene.restart({ stageIndex: this.stageIndex });
       }
+    }
+
+    getPointerZone(x) {
+      const third = WIDTH / 3;
+      if (x < third) return "left";
+      if (x > third * 2) return "right";
+      return "center";
+    }
+
+    updateMobileDirections() {
+      let left = false;
+      let right = false;
+      for (const zone of this.pointerZones.values()) {
+        if (zone === "left") left = true;
+        if (zone === "right") right = true;
+      }
+      this.mobileInput.left = left;
+      this.mobileInput.right = right;
     }
   }
 

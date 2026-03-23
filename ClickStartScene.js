@@ -18,6 +18,11 @@
         FuncJump.UI.setError("");
       }
 
+      const pageLoading = document.getElementById("page-loading");
+      if (pageLoading) {
+        pageLoading.classList.add("hidden");
+      }
+
       this.add.text(centerX, centerY - 20, "Click to Start", {
         fontSize: "28px",
         color: "#ffffff",

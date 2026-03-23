@@ -40,7 +40,10 @@
           color: "#8cc9ff",
         }).setOrigin(0.5);
 
-        const startStage = () => this.scene.start("GameScene", { stageIndex: index });
+        const startStage = () =>
+          this.scene.start("GameScene", {
+            stageIndex: index
+          });
 
         panel.setInteractive({ useHandCursor: true }).on("pointerdown", startStage);
         label.setInteractive({ useHandCursor: true }).on("pointerdown", startStage);

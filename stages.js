@@ -39,10 +39,6 @@
       name: "Stage 4",
       start: { x: 120, y: 420 },
       goal: { x: 780, y: 140 },
-      checkpoints: [
-        { x: 520, y: 420 },
-        { x: 750, y: 170 },
-      ],
       build: (platform) => {
         platform(480, 500, 960, 40);
         platform.reset(750, 200, 210, 20);

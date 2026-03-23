@@ -8,7 +8,36 @@
     }
 
     preload() {
+      this.cameras.main.setBackgroundColor(COLORS.bg);
+      const centerX = WIDTH / 2;
+      const centerY = HEIGHT / 2;
+
+      const loadingText = this.add.text(centerX, centerY - 20, "Loading...", {
+        fontSize: "22px",
+        color: "#8cc9ff",
+        fontStyle: "bold",
+      }).setOrigin(0.5);
+
+      const progressText = this.add.text(centerX, centerY + 16, "0%", {
+        fontSize: "14px",
+        color: "#ffffff",
+      }).setOrigin(0.5);
+
+      this.load.on("progress", (value) => {
+        const percent = Math.floor(value * 100);
+        progressText.setText(`${percent}%`);
+      });
+
+      this.load.on("complete", () => {
+        loadingText.destroy();
+        progressText.destroy();
+      });
+
       this.load.audio("bgm", "./sound/PuzzliNg.mp3");
+      this.load.audio("clear", "./sound/clear.mp3");
+      this.load.audio("failed", "./sound/failed.mp3");
+      this.load.audio("checkpoint", "./sound/checkpoint.mp3");
+      this.load.audio("function-apply", "./sound/function-apply.mp3");
     }
 
     create() { 
@@ -55,7 +84,7 @@
       makeButton(centerY + 60, "Rules", "RulesScene");
       makeButton(centerY + 120, "Credits", "CreditsScene");
 
-      this.add.text(centerX, HEIGHT - 40, "Controls: Left/Right or A/D  Jump: Space", {
+      this.add.text(centerX, HEIGHT - 40, "Controls: Left/Right or A/D  Jump: Z", {
         fontSize: "14px",
         color: "#8cc9ff",
       }).setOrigin(0.5);

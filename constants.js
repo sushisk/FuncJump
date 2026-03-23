@@ -1,6 +1,9 @@
 (() => {
   const FuncJump = (window.FuncJump = window.FuncJump || {});
 
+  FuncJump.IS_MOBILE =
+    /Mobi|Android|iPhone|iPad|iPod|Windows Phone/i.test(navigator.userAgent) ||
+    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
   FuncJump.WIDTH = 960;
   FuncJump.HEIGHT = 540;
   FuncJump.GRID_SIZE = 60;
