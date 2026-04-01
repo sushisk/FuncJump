@@ -101,6 +101,7 @@
       this.cursors = this.input.keyboard.createCursorKeys();
       this.keyR = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
       this.keyZ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
+      this.input.keyboard.removeCapture(Phaser.Input.Keyboard.KeyCodes.SPACE);
       this.mobileInput = { left: false, right: false, jumpRequested: false };
       this.pointerZones = new Map();
 
@@ -132,8 +133,8 @@
         fontSize: "18px",
         color: "#ffffff",
       }).setDepth(10);
-      this.add.text(20, 38, "R: Retry  ESC: Stage Select", {
-        fontSize: "12px",
+      this.add.text(20, 38, "← →: Move  Z: Jump\nR: Retry  ESC: Stage Select", {
+        fontSize: "14px",
         color: "#8cc9ff",
       }).setDepth(10);
 
@@ -158,6 +159,11 @@
             }
           },
         });
+
+        this.input.keyboard.on("keydown-ENTER", () => {
+          const text = FuncJump.UI?.input ? FuncJump.UI.input.value : "";
+          FuncJump.UI?.onApply?.(text);
+        });
       }
     }
 
@@ -167,8 +173,8 @@
           const { bodyA, bodyB } = pair;
           const playerBody = this.player.body;
           if (bodyA === playerBody || bodyB === playerBody) {
-            const other = bodyA === playerBody ? bodyB : bodyA;
-            const normalY = bodyA === playerBody ? pair.collision.normal.y : -pair.collision.normal.y;
+            const other = (bodyA === playerBody ? bodyB : bodyA);
+            const normalY = (bodyA === playerBody ? pair.collision.normal.y : -pair.collision.normal.y);
 
             if (other.label === "checkpoint") {
               this.handleCheckpoint(other);
@@ -186,7 +192,7 @@
               this.playSfx("failed");
             }
 
-            if (normalY < -0.5 && !other.isSensor) {
+            if (normalY < -0.8 && !other.isSensor) {
               this.groundPairs.add(pair.id);
             }
           }
@@ -780,8 +786,8 @@
         color: "#ffffff",
         fontStyle: "bold",
       }).setOrigin(0.5);
-      const sub = this.add.text(centerX, centerY + 30, "Click or press Z to continue", {
-        fontSize: "14px",
+      const sub = this.add.text(centerX, centerY + 30, "Click or press Z", {
+        fontSize: "16px",
         color: "#8cc9ff",
       }).setOrigin(0.5);
 

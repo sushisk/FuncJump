@@ -23,18 +23,18 @@
       }).setOrigin(0.5);
 
       const lines = [
-        "Goal: Reach the goal block to clear the stage.",
-        "Falling below the screen restarts the stage.",
-        "Some stages include a reset platform that",
-        "applies the current function instantly.",
+        "← →: Move",
+        "Z: Jump",
+        "R: Rest",
+        "Enter: Function apply",
         "",
-        "Jump key: Z",
-        "Use the function input to create platforms",
-        "and solve each stage.",
+        "Input equation with x,y and press apply",
+        "sin, asin, log, etc. is available",
+        "Constants like Pi, e is also available"
       ];
 
       this.add.text(centerX, 150, lines.join("\n"), {
-        fontSize: "16px",
+        fontSize: "18px",
         color: "#8cc9ff",
         align: "center",
         lineSpacing: 8,
